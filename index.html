@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevSpace | Secure Management</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        :root {
+            --primary: #00d2ff;
+            --secondary: #3a7bd5;
+            --dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --danger: #ff4757;
+            --success: #00eb84;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
+            color: #f8fafc;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 500px; margin: auto; }
+
+        header { text-align: center; margin-bottom: 30px; }
+        header h1 { 
+            margin: 0; 
+            font-size: 2.2rem; 
+            letter-spacing: 3px; 
+            background: linear-gradient(to right, var(--primary), var(--secondary)); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+            text-transform: uppercase;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: white;
+            box-sizing: border-box;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        input:focus { border-color: var(--primary); box-shadow: 0 0 10px rgba(0, 210, 255, 0.3); }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+
+        button:active { transform: scale(0.96); }
+
+        #main-content, #admin-panel { display: none; }
+
+        .admin-section { border: 1px dashed var(--danger); margin-bottom: 25px; }
+
+        .project-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .project-item a { 
+            color: var(--primary); 
+            text-decoration: none; 
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .btn-del { 
+            background: var(--danger); 
+            width: auto; 
+            padding: 6px 12px; 
+            font-size: 11px; 
+            margin-top: 0;
+        }
+
+        .badge { 
+            background: var(--success); 
+            color: #0f172a;
+            font-size: 10px; 
+            padding: 3px 10px; 
+            border-radius: 20px; 
+            font-weight: bold;
+        }
+
+        /* Customizing SweetAlert Dark Theme */
+        .swal2-popup {
+            background: #1e293b !important;
+            color: #f8fafc !important;
+            border-radius: 20px !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>DEVSPACE</h1>
+        <p style="color: #94a3b8; font-size: 0.8rem; margin-top: 5px;">Secure Portfolio Manager</p>
+    </header>
+
+    <div id="login-box" class="glass-card">
+        <h3 style="text-align: center; margin-top: 0;">Akses Terkunci</h3>
+        <input type="password" id="passInput" placeholder="Masukkan Password (Admin/Member)">
+        <button onclick="handleLogin()">Buka Akses</button>
+    </div>
+
+    <div id="main-content">
+        <div id="admin-panel" class="glass-card admin-section">
+            <h3 style="color: var(--danger); margin-top: 0; font-size: 0.9rem;">🛠 MODE ADMIN AKTIF</h3>
+            <input type="text" id="siteTitle" placeholder="Nama Project">
+            <input type="text" id="siteUrl" placeholder="Link URL (https://...)">
+            <button onclick="addProject()">Tambah Project</button>
+            <button onclick="broadcastMessage()" style="background: #f59e0b; margin-top: 10px;">Kirim Pesan Global</button>
+        </div>
+
+        <div id="member-panel" class="glass-card">
+            <h3 style="margin-top: 0; border-bottom: 1px solid #334155; padding-bottom: 10px;">Project Gallery</h3>
+            <div id="project-list">
+                <p style="text-align: center; color: #64748b;">Menunggu data...</p>
+            </div>
+        </div>
+
+        <button onclick="location.reload()" style="background: transparent; border: 1px solid #334155; color: #64748b; font-size: 11px;">Logout / Ganti Akun</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyA6dlG_0g_25YkeKM8krMxN6cJBm4xSao0",
+        authDomain: "devsapce.firebaseapp.com",
+        databaseURL: "https://devsapce-default-rtdb.firebaseio.com", 
+        projectId: "devsapce",
+        storageBucket: "devsapce.firebasestorage.app",
+        messagingSenderId: "239019966299",
+        appId: "1:239019966299:web:7fce282619685cbc13647e",
+        measurementId: "G-SENKB88WJB"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    let isAdminMode = false;
+
+    function handleLogin() {
+        const pass = document.getElementById('passInput').value;
+        const loginBox = document.getElementById('login-box');
+        const mainContent = document.getElementById('main-content');
+        const adminPanel = document.getElementById('admin-panel');
+
+        if (pass === "ditzz11") { 
+            isAdminMode = true;
+            loginBox.style.display = 'none';
+            mainContent.style.display = 'block';
+            adminPanel.style.display = 'block';
+            Swal.fire({
+                icon: 'success',
+                title: 'Welcome Adit!',
+                text: 'Mode Admin telah diaktifkan.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            loadData();
+        } 
+        else if (pass === "memberdev") { 
+            isAdminMode = false;
+            loginBox.style.display = 'none';
+            mainContent.style.display = 'block';
+            adminPanel.style.display = 'none';
+            Swal.fire({
+                icon: 'info',
+                title: 'Akses Diterima',
+                text: 'Selamat mengeksplorasi galeri.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            loadData();
+        } 
+        else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Password Salah',
+                text: 'Silakan cek kembali kode aksesnya.',
+                confirmButtonColor: '#3a7bd5'
+            });
+        }
+    }
+
+    function addProject() {
+        if(!isAdminMode) return;
+        const title = document.getElementById('siteTitle').value;
+        const url = document.getElementById('siteUrl').value;
+        if(title && url) {
+            db.ref('projects').push({ title, url });
+            document.getElementById('siteTitle').value = '';
+            document.getElementById('siteUrl').value = '';
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: 'Project baru telah ditambahkan.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        } else {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Lengkapi Data',
+                text: 'Nama dan URL tidak boleh kosong.',
+                confirmButtonColor: '#3a7bd5'
+            });
+        }
+    }
+
+    function deleteProject(id) {
+        if(!isAdminMode) return;
+        Swal.fire({
+            title: 'Hapus Project?',
+            text: "Data yang dihapus tidak bisa dikembalikan!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ff4757',
+            cancelButtonColor: '#334155',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                db.ref('projects/' + id).remove();
+                Swal.fire('Terhapus!', 'Project telah dibuang.', 'success');
+            }
+        })
+    }
+
+    function broadcastMessage() {
+        if(!isAdminMode) return;
+        Swal.fire({
+            title: 'Kirim Pesan Global',
+            input: 'text',
+            inputPlaceholder: 'Ketik pesan di sini...',
+            showCancelButton: true,
+            confirmButtonText: 'Kirim Sekarang',
+            confirmButtonColor: '#f59e0b',
+            preConfirm: (msg) => {
+                if (!msg) {
+                    Swal.showValidationMessage('Pesan tidak boleh kosong!');
+                }
+                return msg;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                db.ref('commands').set({
+                    content: result.value,
+                    timestamp: Date.now()
+                });
+                Swal.fire('Terkirim!', 'Pesan sudah dipush ke semua member.', 'success');
+            }
+        })
+    }
+
+    function loadData() {
+        db.ref('projects').on('value', (snapshot) => {
+            const list = document.getElementById('project-list');
+            list.innerHTML = '';
+            if(!snapshot.exists()) {
+                list.innerHTML = '<p style="text-align: center; color: #64748b;">Belum ada project.</p>';
+                return;
+            }
+            snapshot.forEach((child) => {
+                const data = child.val();
+                list.innerHTML += `
+                    <div class="project-item">
+                        <div>
+                            <a href="${data.url}" target="_blank">${data.title}</a>
+                        </div>
+                        ${isAdminMode ? 
+                            `<button class="btn-del" onclick="deleteProject('${child.key}')">HAPUS</button>` : 
+                            '<span class="badge">AKTIF</span>'}
+                    </div>
+                `;
+            });
+        });
+    }
+
+    db.ref('commands').on('value', (snapshot) => {
+        const cmd = snapshot.val();
+        if(cmd && (Date.now() - cmd.timestamp < 10000)) {
+            Swal.fire({
+                title: '📢 PESAN DARI ADIT',
+                text: cmd.content,
+                icon: 'info',
+                confirmButtonColor: '#00d2ff'
+            });
+        }
+    });
+</script>
+</body>
+</html>
